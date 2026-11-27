@@ -30,7 +30,7 @@ export interface OutboundDoc {
   authorSub: string | null;
   status: OutStatus;
   statusRank: number;
-  sendState: 'pending';
+  sendState: 'pending' | 'accepted' | 'dead';
   attempts: number;
   nextAttemptAt: Date;
   leaseUntil: Date | null;
@@ -94,6 +94,7 @@ export async function ensureIndexes(): Promise<void> {
     c.conversations.createIndex({ workspace: 1, lastActivityAt: -1 }),
     c.outbound.createIndex({ workspace: 1, clientRef: 1 }, { unique: true }),
     c.outbound.createIndex({ sendState: 1, nextAttemptAt: 1 }),
+    c.outbound.createIndex({ workspace: 1, sendState: 1, nextAttemptAt: 1 }),
     c.feed.createIndex({ workspace: 1, seq: 1 }, { unique: true }),
     c.feed.createIndex({ workspace: 1, dedupeKey: 1 }, { unique: true }),
   ]);

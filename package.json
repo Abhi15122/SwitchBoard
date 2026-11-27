@@ -13,6 +13,8 @@
     "doctor": "node harness/doctor.js",
     "check": "node harness/check.js",
     "check:full": "node harness/check.js --full",
+    "check:win": "node harness/check.win.js",
+    "check:win:full": "node harness/check.win.js --full",
     "chaos": "node harness/pigeon.js chaos",
     "report": "node harness/pigeon.js report",
     "inbound": "node harness/pigeon.js inbound",

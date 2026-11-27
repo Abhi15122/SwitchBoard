@@ -1,8 +1,9 @@
 import express, { Router } from 'express';
 import { config } from './config.js';
 import { appendFrame } from './feed.js';
+import { advanceStatus } from './outbound.js';
 import { verifyPigeonSignature } from './signature.js';
-import { cols, isDuplicateKey, statusRank, upsertConversation, type OutStatus } from './store.js';
+import { cols, isDuplicateKey, upsertConversation } from './store.js';
 import { ah, isRecord, isString, known } from './util.js';
 
 export const webhooks = Router();
@@ -37,7 +38,7 @@ webhooks.post(
       return res.json({ ok: true });
     }
 
-    if (isRecord(data) && isString(data.client_ref) && isString(data.status)) await applyStatus(workspace, data.client_ref, data.status);
+    if (isRecord(data) && isString(data.client_ref) && isString(data.status)) await advanceStatus(workspace, data.client_ref, data.status);
     return res.json({ ok: true });
   }),
 );
@@ -51,18 +52,4 @@ async function storeInbound(workspace: string, contact: string, messageId: strin
   }
   await upsertConversation(workspace, contact, occurredAt);
   await appendFrame(workspace, `in:${messageId}`, { type: 'message.inbound', contact, message_id: messageId });
-}
-
-async function applyStatus(workspace: string, clientRef: string, status: string) {
-  const rank = statusRank(status);
-  if (status === 'queued' || rank === undefined) return;
-  const { outbound } = await cols();
-  const moved = await outbound.findOneAndUpdate(
-    { workspace, clientRef, statusRank: { $lt: rank } },
-    { $set: { status: status as OutStatus, statusRank: rank } },
-    { returnDocument: 'after' },
-  );
-  const doc = moved ?? (await outbound.findOne({ workspace, clientRef }));
-  if (!doc || doc.status !== status) return;
-  await appendFrame(workspace, `st:${clientRef}:${status}`, { type: 'message.status', contact: doc.contact, client_ref: clientRef, status: doc.status });
 }

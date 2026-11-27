@@ -1,12 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 // The browser talks to one origin (:5173). These paths are passed through to
-// the server on :4000. Add or remove prefixes to suit your API.
-const server = 'http://localhost:4000';
+// the server, which is http://localhost:4000 unless VITE_API_ORIGIN says otherwise.
+const server = process.env.VITE_API_ORIGIN ?? 'http://localhost:4000';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
     proxy: {

@@ -6,6 +6,7 @@ import { grader } from './grader.js';
 import { getRedis } from './redis.js';
 import { ensureIndexes } from './store.js';
 import { webhooks } from './webhooks.js';
+import { startWorker, stopWorker } from './worker.js';
 
 const app = express();
 let ready = false;
@@ -39,6 +40,7 @@ async function boot() {
       await ensureIndexes();
       await getRedis().ping();
       ready = true;
+      startWorker();
       return;
     } catch (err) {
       console.error('boot failed, retrying', err instanceof Error ? err.message : err);
@@ -47,3 +49,9 @@ async function boot() {
   }
 }
 void boot();
+
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.once(signal, () => {
+    void stopWorker().finally(() => process.exit(0));
+  });
+}
