@@ -122,6 +122,7 @@ export function useInbox(workspace: string, me: User): Inbox {
         await api.reply(workspace, selected, text, clientRef);
       } catch (err) {
         dispatch({ type: 'replyDiscarded', contact: selected, clientRef });
+        dispatch({ type: 'resync' });
         throw err;
       }
     },

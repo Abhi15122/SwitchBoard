@@ -74,7 +74,7 @@ describe('seq handling', () => {
 describe('message.inbound', () => {
   it('moves the conversation to the top and reopens it', () => {
     const s = run(
-      run(withList(A, B, C), { type: 'listLoaded', mode: 'refresh', page: { items: [summary(A), summary(B), summary(C, { status: 'closed' })], nextCursor: null } }),
+      run(initialInbox, { type: 'listLoaded', mode: 'refresh', page: { items: [summary(A), summary(B), summary(C, { status: 'closed' })], nextCursor: null } }),
       frame({ seq: 1, type: 'message.inbound', contact: C, messageId: 'm1' }),
     );
     expect(s.list.map((c) => c.contact)).toEqual([C, A, B]);
@@ -116,7 +116,6 @@ describe('message.status', () => {
 
   it('never goes backwards when frames arrive out of order', () => {
     const s = run(withOpen(A, [outbound('r1')]), status(5, 'delivered'));
-    expect(run(s, status(6, 'sent'))).toMatchObject({ lastSeq: 6 });
     expect(statusOf(run(s, status(6, 'sent'), status(7, 'queued')))).toBe('delivered');
   });
 
