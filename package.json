@@ -15,6 +15,8 @@
     "check:full": "node harness/check.js --full",
     "check:win": "node harness/check.win.js",
     "check:win:full": "node harness/check.win.js --full",
+    "check:linux": "docker compose -p sbcheck -f docker-compose.check.yml up --abort-on-container-exit --exit-code-from checker && npm run check:linux:down",
+    "check:linux:down": "docker compose -p sbcheck -f docker-compose.check.yml down -v",
     "chaos": "node harness/pigeon.js chaos",
     "report": "node harness/pigeon.js report",
     "inbound": "node harness/pigeon.js inbound",

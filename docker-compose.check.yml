@@ -1,0 +1,81 @@
+# The official check: the unmodified harness/check.js on Linux, Node 22.
+#
+#   npm run check:linux        runs it, prints the result, removes the stack on success
+#   npm run check:linux:down   removes the stack (needed after a failed run)
+#
+# Run under project name "sbcheck" with no published ports, so it never touches
+# the dev stack from docker-compose.yml. The report lands in .check-out/.
+
+x-mock: &mock
+  image: node:22-alpine
+  working_dir: /srv
+  command: ["node", "server.js"]
+
+services:
+  mongo:
+    image: mongo:7
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 2s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 30
+
+  pigeon:
+    <<: *mock
+    volumes: ["./pigeon:/srv:ro"]
+    environment:
+      - PIGEON_TARGET_URL=http://checker:4000/webhooks/pigeon
+      - PIGEON_WEBHOOK_SECRET=whsec_pigeon_dev
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:4010/healthz"]
+      interval: 2s
+      retries: 30
+
+  idp:
+    <<: *mock
+    volumes: ["./idp:/srv:ro"]
+    environment:
+      - IDP_ISSUER=http://idp:4020
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:4020/.well-known/openid-configuration"]
+      interval: 2s
+      retries: 30
+
+  checker:
+    image: node:22
+    working_dir: /work
+    depends_on:
+      mongo: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      pigeon: { condition: service_healthy }
+      idp: { condition: service_healthy }
+    volumes:
+      - ./:/src:ro
+      - ./.check-out:/out
+    environment:
+      - PIGEON_URL=http://pigeon:4010
+      - MONGO_URL=mongodb://mongo:27017/switchboard
+      - REDIS_URL=redis://redis:6379
+      - OIDC_ISSUER=http://idp:4020
+      - OIDC_REDIRECT_URI=http://localhost:4000/auth/callback
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        node -v
+        rm -f /out/CHECK_REPORT.json
+        tar -C /src --exclude=node_modules --exclude=.git --exclude=.check-logs --exclude=.check-out --exclude=dist -cf - . | tar -C /work -xf -
+        npm run scaffold:install
+        set +e
+        node harness/check.js --full --out /out/CHECK_REPORT.json
+        code=$$?
+        rm -rf /out/check-logs
+        cp -r .check-logs /out/check-logs
+        exit $$code
