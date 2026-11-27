@@ -128,6 +128,8 @@ export function parseFrame(text: string): Frame | null {
         };
       case 'conversation.assigned':
         return { seq, type: o.type, contact, assignee: strOrNull(o, 'assignee') };
+      case 'conversation.status':
+        return { seq, type: o.type, contact, status: oneOf(o, 'status', CONVERSATION_STATUSES) };
       case 'message.outbound':
         return { seq, type: o.type, contact, clientRef: str(o, 'client_ref') };
       default:

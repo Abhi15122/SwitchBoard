@@ -137,6 +137,14 @@ describe('message.status', () => {
   });
 });
 
+describe('conversation.status', () => {
+  it('updates the list and the open head', () => {
+    const s = run(withOpen(A, []), frame({ seq: 1, type: 'conversation.status', contact: A, status: 'closed' }));
+    expect(s.list[0].status).toBe('closed');
+    expect(s.open?.head.status).toBe('closed');
+  });
+});
+
 describe('conversation.assigned', () => {
   it('updates the list and the open head, and can clear the assignee', () => {
     const open = withOpen(A, []);
@@ -237,6 +245,11 @@ describe('list and selection', () => {
   it('resync requests both refetches', () => {
     const s = run(initialInbox, { type: 'resync' });
     expect(s).toMatchObject({ listRefresh: 1, openRefresh: 1 });
+  });
+
+  it('resync accepts frames again from seq 1 after a server reset', () => {
+    const s = run(initialInbox, frame({ seq: 40, type: 'conversation.assigned', contact: A, assignee: 'x' }), { type: 'resync' }, frame({ seq: 1, type: 'conversation.assigned', contact: A, assignee: 'y' }));
+    expect(s.lastSeq).toBe(1);
   });
 });
 

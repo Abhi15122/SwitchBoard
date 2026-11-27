@@ -124,6 +124,16 @@ function applyFrame(state: InboxState, frame: Frame): InboxState {
             : state.open,
       };
 
+    case 'conversation.status':
+      return {
+        ...base,
+        list: patchListItem(state.list, frame.contact, (c) => ({ ...c, status: frame.status }), false),
+        open:
+          isOpen && state.open
+            ? { ...state.open, head: { ...state.open.head, status: frame.status } }
+            : state.open,
+      };
+
     case 'message.outbound': {
       if (isOpen && hasMessage(state.open, frame.clientRef)) return base;
       return {
@@ -202,6 +212,6 @@ export function inboxReducer(state: InboxState, action: InboxAction): InboxState
     }
 
     case 'resync':
-      return { ...state, listRefresh: state.listRefresh + 1, openRefresh: state.openRefresh + 1 };
+      return { ...state, lastSeq: 0, listRefresh: state.listRefresh + 1, openRefresh: state.openRefresh + 1 };
   }
 }

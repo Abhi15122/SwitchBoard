@@ -64,4 +64,5 @@ export type Frame =
   | { seq: number; type: 'message.inbound'; contact: string; messageId: string }
   | { seq: number; type: 'message.status'; contact: string; clientRef: string; status: OutboundStatus }
   | { seq: number; type: 'conversation.assigned'; contact: string; assignee: string | null }
+  | { seq: number; type: 'conversation.status'; contact: string; status: ConversationStatus }
   | { seq: number; type: 'message.outbound'; contact: string; clientRef: string };

@@ -17,6 +17,7 @@ export interface ConversationDoc {
   contact: string;
   assignee: string | null;
   assignVersion: number;
+  statusVersion?: number;
   status: 'open' | 'closed';
   lastActivityAt: Date;
   createdAt: Date;
@@ -41,7 +42,8 @@ export interface OutboundDoc {
 export type Frame =
   | { seq: number; type: 'message.inbound'; contact: string; message_id: string }
   | { seq: number; type: 'message.status'; contact: string; client_ref: string; status: OutStatus }
-  | { seq: number; type: 'conversation.assigned'; contact: string; assignee: string }
+  | { seq: number; type: 'conversation.assigned'; contact: string; assignee: string | null }
+  | { seq: number; type: 'conversation.status'; contact: string; status: 'open' | 'closed' }
   | { seq: number; type: 'message.outbound'; contact: string; client_ref: string };
 
 export interface FeedDoc {
@@ -93,6 +95,7 @@ export async function ensureIndexes(): Promise<void> {
     c.conversations.createIndex({ workspace: 1, contact: 1 }, { unique: true }),
     c.conversations.createIndex({ workspace: 1, lastActivityAt: -1 }),
     c.outbound.createIndex({ workspace: 1, clientRef: 1 }, { unique: true }),
+    c.outbound.createIndex({ workspace: 1, contact: 1, createdAt: 1 }),
     c.outbound.createIndex({ sendState: 1, nextAttemptAt: 1 }),
     c.outbound.createIndex({ workspace: 1, sendState: 1, nextAttemptAt: 1 }),
     c.feed.createIndex({ workspace: 1, seq: 1 }, { unique: true }),

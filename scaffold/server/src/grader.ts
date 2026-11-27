@@ -1,10 +1,9 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import express, { Router } from 'express';
-import type { Document } from 'mongodb';
 import { config } from './config.js';
-import { appendFrame } from './feed.js';
+import { claimConversation, queueReply } from './conversations.js';
 import { getRedis } from './redis.js';
-import { cols, isDuplicateKey, upsertConversation } from './store.js';
+import { cols } from './store.js';
 import { ah, isRecord, isString, known } from './util.js';
 
 export const grader = Router();
@@ -71,31 +70,9 @@ grader.post(
     const b = req.body;
     if (!isRecord(b) || !text(b.workspace) || !text(b.contact) || !text(b.text) || !text(b.client_ref)) return res.status(400).json({ error: 'workspace, contact, text, client_ref must be non-empty strings' });
     if (!known(config.pigeon.apiKeys, b.workspace)) return res.status(404).json({ error: 'unknown workspace' });
-    const { workspace, contact, client_ref: clientRef } = b as { workspace: string; contact: string; text: string; client_ref: string };
+    const { workspace, contact, text: body, client_ref: clientRef } = b as { workspace: string; contact: string; text: string; client_ref: string };
 
-    const now = new Date();
-    await upsertConversation(workspace, contact, now);
-    const { outbound } = await cols();
-    try {
-      await outbound.insertOne({
-        workspace,
-        contact,
-        text: b.text,
-        clientRef,
-        authorSub: null,
-        status: 'queued',
-        statusRank: 0,
-        sendState: 'pending',
-        attempts: 0,
-        nextAttemptAt: now,
-        leaseUntil: null,
-        pigeonId: null,
-        createdAt: now,
-      });
-    } catch (err) {
-      if (!isDuplicateKey(err)) throw err;
-    }
-    await appendFrame(workspace, `out:${clientRef}`, { type: 'message.outbound', contact, client_ref: clientRef });
+    await queueReply({ workspace, contact, text: body, clientRef, authorSub: null });
     res.status(202).json({ ok: true });
   }),
 );
@@ -107,36 +84,8 @@ grader.post(
     if (!isRecord(b) || !text(b.workspace) || !text(b.contact) || !text(b.agent)) return res.status(400).json({ error: 'workspace, contact, agent must be non-empty strings' });
     if (!known(config.pigeon.apiKeys, b.workspace)) return res.status(404).json({ error: 'unknown workspace' });
     const { workspace, contact, agent } = b as { workspace: string; contact: string; agent: string };
-    const { conversations } = await cols();
-
-    const claimPipeline: Document[] = [
-      {
-        $set: {
-          assignVersion: { $cond: [{ $eq: ['$assignee', { $literal: agent }] }, '$assignVersion', { $add: [{ $ifNull: ['$assignVersion', 0] }, 1] }] },
-          assignee: { $literal: agent },
-          status: { $ifNull: ['$status', 'open'] },
-          createdAt: { $ifNull: ['$createdAt', '$$NOW'] },
-          lastActivityAt: { $ifNull: ['$lastActivityAt', '$$NOW'] },
-        },
-      },
-    ];
-
-    for (let attempt = 0; attempt < 5; attempt++) {
-      try {
-        const after = await conversations.findOneAndUpdate(
-          { workspace, contact, $or: [{ assignee: null }, { assignee: agent }] },
-          claimPipeline,
-          { upsert: true, returnDocument: 'after' },
-        );
-        if (!after) throw new Error('claim upsert returned nothing');
-        await appendFrame(workspace, `asg:${contact}:${after.assignVersion}`, { type: 'conversation.assigned', contact, assignee: agent });
-        return res.json({ ok: true, assignee: agent });
-      } catch (err) {
-        if (!isDuplicateKey(err)) throw err;
-        const holder = await conversations.findOne({ workspace, contact });
-        if (holder?.assignee && holder.assignee !== agent) return res.status(409).json({ ok: false, assignee: holder.assignee });
-      }
-    }
-    throw new Error('claim did not settle');
+    const result = await claimConversation(workspace, contact, agent);
+    if ('heldBy' in result) return res.status(409).json({ ok: false, assignee: result.heldBy });
+    res.json({ ok: true, assignee: agent });
   }),
 );

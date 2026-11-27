@@ -1,11 +1,14 @@
 import express, { type ErrorRequestHandler } from 'express';
 import { createServer } from 'node:http';
+import { api } from './api.js';
+import { auth } from './auth.js';
 import { config } from './config.js';
 import { getDb } from './db.js';
 import { grader } from './grader.js';
 import { getRedis } from './redis.js';
 import { ensureIndexes } from './store.js';
 import { webhooks } from './webhooks.js';
+import { attachWebSocket } from './ws.js';
 import { startWorker, stopWorker } from './worker.js';
 
 const app = express();
@@ -18,6 +21,8 @@ app.get('/healthz', (_req, res) => {
 
 app.use(webhooks);
 app.use(grader);
+app.use(auth);
+app.use(api);
 
 const onError: ErrorRequestHandler = (err, req, res, next) => {
   if (res.headersSent) return next(err);
@@ -29,6 +34,7 @@ const onError: ErrorRequestHandler = (err, req, res, next) => {
 app.use(onError);
 
 const server = createServer(app);
+attachWebSocket(server);
 server.listen(config.port, () => {
   console.log(`server on http://localhost:${config.port}`);
 });

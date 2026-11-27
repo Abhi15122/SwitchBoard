@@ -6,6 +6,7 @@ export type ConnectionState = 'connecting' | 'live' | 'reconnecting';
 
 const MIN_DELAY_MS = 1000;
 const MAX_DELAY_MS = 15000;
+const RESET_CLOSE_CODE = 4000;
 
 /**
  * Keeps one WebSocket open for a workspace and hands each frame with a new seq
@@ -50,8 +51,9 @@ export function useFeed(workspace: string, onFrame: (frame: Frame) => void, onRe
         handlers.current.onFrame(frame);
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         if (stopped) return;
+        if (event.code === RESET_CLOSE_CODE) lastSeq.current = 0;
         wasDown = true;
         setState('reconnecting');
         const delay = Math.min(MIN_DELAY_MS * 2 ** attempt, MAX_DELAY_MS);
